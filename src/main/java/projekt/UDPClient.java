@@ -98,4 +98,11 @@ public class UDPClient {
         
         }
     }
+
+    public void close() throws IOException {
+        this.isRunning = false;
+        this.IOHandling.shutdownNow();
+        this.multicastChannel.close();
+        this.broadcastChannel.close();
+    }
 }
