@@ -9,6 +9,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -81,5 +83,19 @@ public class UDPClient {
     }
 
     private void handleSend(){
+        try(Scanner scanner = new Scanner(System.in)){
+            while(this.isRunning){
+                String input = scanner.nextLine();
+                ByteBuffer buffer = ByteBuffer.wrap(input.getBytes(StandardCharsets.UTF_8));
+
+                this.multicastChannel.send(buffer, new InetSocketAddress(this.MULTICAST_GROUP_ADDRESS, this.PORT));
+                this.broadcastChannel.send(buffer, new InetSocketAddress("255.255.255.255", this.PORT));
+            }
+        }catch(Exception e){
+            if(this.isRunning){
+                e.printStackTrace();
+            }
+        
+        }
     }
 }
