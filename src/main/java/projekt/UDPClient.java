@@ -5,7 +5,10 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.StandardSocketOptions;
+import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -19,9 +22,12 @@ public class UDPClient {
 
     private final int PORT;
     private final String MULTICAST_GROUP_ADDRESS = "239.1.1.1";
+    
+    private volatile boolean isRunning;
 
     public UDPClient(int port) throws IOException {
         this.PORT = port;
+        this.isRunning = false;
         setupMulticast();
         setupBroadcast();
     }
@@ -41,11 +47,37 @@ public class UDPClient {
     }
 
     public void start(){
+        this.isRunning = true;
         this.IOHandling.submit(this::handleSend);
         this.IOHandling.submit(this::handleReceive);
     }
     
     private void handleReceive(){
+        try(Selector selector = Selector.open()){
+            this.multicastChannel.register(selector, SelectionKey.OP_READ, "MULTICAST");
+            this.broadcastChannel.register(selector, SelectionKey.OP_READ, "BROADCAST");
+            
+            ByteBuffer buffer = ByteBuffer.allocate(4096);
+
+            while(this.isRunning){
+                selector.select();
+                for(SelectionKey key : selector.selectedKeys()){
+                    buffer.clear();
+                    String type = (String)key.attachment();
+                    DatagramChannel channel = (DatagramChannel)key.channel();
+
+                    InetSocketAddress senderAddress = (InetSocketAddress) channel.receive(buffer);
+                    String message = new String(buffer.array(), 0, buffer.limit()); 
+                    System.out.println(type + "|" + senderAddress + ": " + message);
+                }
+                selector.selectedKeys().clear();
+            }
+
+        }catch(Exception e){
+            if(this.isRunning){
+                e.printStackTrace();
+            }
+        }
     }
 
     private void handleSend(){
