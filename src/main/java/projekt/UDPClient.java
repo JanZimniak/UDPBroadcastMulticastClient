@@ -14,6 +14,8 @@ import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import projekt.enums.ChannelType;
+
 public class UDPClient {
 
     private DatagramChannel multicastChannel;
@@ -88,8 +90,17 @@ public class UDPClient {
                 String input = scanner.nextLine();
                 ByteBuffer buffer = ByteBuffer.wrap(input.getBytes(StandardCharsets.UTF_8));
 
-                this.multicastChannel.send(buffer, new InetSocketAddress(this.MULTICAST_GROUP_ADDRESS, this.PORT));
-                this.broadcastChannel.send(buffer, new InetSocketAddress("255.255.255.255", this.PORT));
+                ChannelType channelType = getChannelTypeFromInput(input);
+                if(channelType == ChannelType.UNDEFINED){
+                    System.out.println("Define channel type: <channel_type> message");
+                    continue;
+                }
+
+                if(channelType == ChannelType.MULTICAST){
+                    this.multicastChannel.send(buffer, new InetSocketAddress(this.MULTICAST_GROUP_ADDRESS, this.PORT));
+                }else{
+                    this.broadcastChannel.send(buffer, new InetSocketAddress("255.255.255.255", this.PORT));
+                }
             }
         }catch(Exception e){
             if(this.isRunning){
@@ -97,6 +108,18 @@ public class UDPClient {
             }
         
         }
+    }
+
+    private ChannelType getChannelTypeFromInput(String input){
+        String broadcastPrefix = "Broadcast";
+        String multicastPrefix = "Multicast";
+        if(input.toLowerCase().startsWith(broadcastPrefix.toLowerCase())){
+            return ChannelType.BROADCAST;
+        }
+        if(input.toLowerCase().startsWith(multicastPrefix.toLowerCase())){
+            return ChannelType.MULTICAST;
+        }
+        return ChannelType.UNDEFINED;
     }
 
     public void close() throws IOException {
