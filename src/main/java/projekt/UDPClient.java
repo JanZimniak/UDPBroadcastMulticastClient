@@ -101,35 +101,46 @@ public class UDPClient {
     private void handleSend(){
         try(Scanner scanner = new Scanner(System.in)){
             while(this.isRunning){
-                String input = scanner.nextLine();
-                if(input.equals("end")){
-                    close();
-                    return;
-                }
+                System.out.print("Choose type (broadcast/multicast/end): ");
+                String choice = scanner.nextLine();
 
-                Integer port = getPortFromInput(input);
-                ChannelType channelType = getChannelTypeFromInput(input);
-                if(channelType == ChannelType.UNDEFINED || port <= 0){
-                    System.out.println("Define channel type: <port><channel_type> message");
-                    continue;
-                }
+                switch(choice.toLowerCase()){
+                    case "end" -> {
+                        close();
+                        return;
+                    }
+                    case "broadcast" -> {
+                        System.out.print("Port: ");
+                        int port = Integer.parseInt(scanner.nextLine());
 
-                String message = cleanInput(input);
-                ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
+                        System.out.print("Message: ");
+                        String message = scanner.nextLine();
 
-                if(channelType == ChannelType.MULTICAST){
-                    this.multicastChannel.send(buffer, new InetSocketAddress(this.MULTICAST_GROUP_ADDRESS, getMulticastPort(port)));
-                }else{
-                    this.broadcastChannel.send(buffer, new InetSocketAddress("255.255.255.255", getBroadcastPort(port)));
+                        ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
+                        this.broadcastChannel.send(buffer,
+                            new InetSocketAddress("255.255.255.255", getBroadcastPort(port)));
+                    }
+                    case "multicast" -> {
+                        System.out.print("Port: ");
+                        int port = Integer.parseInt(scanner.nextLine());
+
+                        System.out.print("Multicast address: ");
+                        String address = scanner.nextLine();
+
+                        System.out.print("Message: ");
+                        String message = scanner.nextLine();
+
+                        ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
+                        this.multicastChannel.send(buffer,
+                            new InetSocketAddress(address, getMulticastPort(port)));
+                    }
+                    default -> System.out.println("Unknown option.");
                 }
             }
-        }catch(Exception e){
-            if(this.isRunning){
-                e.printStackTrace();
-            }
-        
+        } catch(Exception e){
+            if(this.isRunning) e.printStackTrace();
         }
-    }
+    }    
 
     private int getMulticastPort(int port){
         return port;
@@ -137,36 +148,6 @@ public class UDPClient {
 
     private int getBroadcastPort(int port){
         return port + 1;
-    }
-
-    private String cleanInput(String input){
-        int prefixLength = 4 + this.MULTICAST_PREFIX.length();
-        input = input.substring(prefixLength); 
-        if(input.startsWith(" ")){
-            input = input.substring(1);
-        }
-        return input;
-    }
-
-    private Integer getPortFromInput(String input){
-        String strPort = input.substring(0, 4);
-        try{
-            int port = Integer.parseInt(strPort);
-            return port;
-        }catch(NumberFormatException e){
-            return -1;
-        }
-    }
-
-    private ChannelType getChannelTypeFromInput(String input){
-        input = input.substring(4);
-        if(input.toLowerCase().startsWith(this.BROADCAST_PREFIX.toLowerCase())){
-            return ChannelType.BROADCAST;
-        }
-        if(input.toLowerCase().startsWith(this.MULTICAST_PREFIX.toLowerCase())){
-            return ChannelType.MULTICAST;
-        }
-        return ChannelType.UNDEFINED;
     }
 
     public void close() throws IOException {
