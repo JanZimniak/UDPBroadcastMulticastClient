@@ -25,14 +25,19 @@ public class UDPClient {
     private ExecutorService IOHandling = Executors.newFixedThreadPool(2);
 
     private final int PORT;
-    private final String MULTICAST_GROUP_ADDRESS = "239.1.1.1";
     private final String BROADCAST_PREFIX = "B";
+    private final int BROADCAST_PORT;
+
     private final String MULTICAST_PREFIX = "M";
+    private final int MULTICAST_PORT;
+    private final String MULTICAST_GROUP_ADDRESS = "239.1.1.1";
     
     private volatile boolean isRunning;
 
     public UDPClient(int host_port) throws IOException {
         this.PORT = host_port;
+        this.BROADCAST_PORT = getBroadcastPort(this.PORT);
+        this.MULTICAST_PORT = getMulticastPort(this.PORT);
 
         this.isRunning = false;
         setupMulticast();
@@ -43,7 +48,7 @@ public class UDPClient {
         this.multicastChannel = DatagramChannel.open();
         this.multicastChannel.configureBlocking(false);
         this.multicastChannel.setOption(StandardSocketOptions.SO_REUSEADDR, true);
-        this.multicastChannel.bind(new InetSocketAddress(this.PORT));
+        this.multicastChannel.bind(new InetSocketAddress(this.MULTICAST_PORT));
         this.multicastChannel.join(InetAddress.getByName(this.MULTICAST_GROUP_ADDRESS), this.nic);
     }
 
@@ -52,7 +57,7 @@ public class UDPClient {
         this.broadcastChannel.configureBlocking(false);
         this.broadcastChannel.setOption(StandardSocketOptions.SO_REUSEADDR, true);
         this.broadcastChannel.setOption(StandardSocketOptions.SO_BROADCAST, true);
-        this.broadcastChannel.bind(new InetSocketAddress(this.PORT));
+        this.broadcastChannel.bind(new InetSocketAddress(this.BROADCAST_PORT));
     }
 
     public void start(){
@@ -106,9 +111,9 @@ public class UDPClient {
                 ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
 
                 if(channelType == ChannelType.MULTICAST){
-                    this.multicastChannel.send(buffer, new InetSocketAddress(this.MULTICAST_GROUP_ADDRESS, port));
+                    this.multicastChannel.send(buffer, new InetSocketAddress(this.MULTICAST_GROUP_ADDRESS, getMulticastPort(port)));
                 }else{
-                    this.broadcastChannel.send(buffer, new InetSocketAddress("255.255.255.255", port));
+                    this.broadcastChannel.send(buffer, new InetSocketAddress("255.255.255.255", getBroadcastPort(port)));
                 }
             }
         }catch(Exception e){
@@ -117,6 +122,14 @@ public class UDPClient {
             }
         
         }
+    }
+
+    private int getMulticastPort(int port){
+        return port;
+    }
+
+    private int getBroadcastPort(int port){
+        return port + 1;
     }
 
     private String cleanInput(String input){
