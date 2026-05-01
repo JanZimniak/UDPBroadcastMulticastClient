@@ -76,6 +76,7 @@ public class UDPClient {
                     DatagramChannel channel = (DatagramChannel)key.channel();
 
                     InetSocketAddress senderAddress = (InetSocketAddress) channel.receive(buffer);
+                    buffer.flip();
                     String message = new String(buffer.array(), 0, buffer.limit()); 
                     System.out.println(type + senderAddress + ": " + message);
                 }
