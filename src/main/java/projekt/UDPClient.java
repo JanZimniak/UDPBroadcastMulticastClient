@@ -64,6 +64,9 @@ public class UDPClient {
         this.isRunning = true;
         this.IOHandling.submit(this::handleSend);
         this.IOHandling.submit(this::handleReceive);
+        System.out.println("Client is running");
+        System.out.println("Type <end> to close client");
+        System.out.println("Message structure: <port><type> message");
     }
     
     private void handleReceive(){
@@ -99,6 +102,10 @@ public class UDPClient {
         try(Scanner scanner = new Scanner(System.in)){
             while(this.isRunning){
                 String input = scanner.nextLine();
+                if(input.equals("end")){
+                    close();
+                    return;
+                }
 
                 Integer port = getPortFromInput(input);
                 ChannelType channelType = getChannelTypeFromInput(input);
