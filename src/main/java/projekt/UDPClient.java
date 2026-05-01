@@ -130,4 +130,9 @@ public class UDPClient {
         this.multicastChannel.close();
         this.broadcastChannel.close();
     }
+
+    public static void main(String[] args) throws IOException {
+        UDPClient client = new UDPClient(4444);
+        client.start();
+    }
 }
