@@ -4,17 +4,18 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.net.StandardSocketOptions;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import projekt.enums.ChannelType;
 
 public class UDPClient {
 
@@ -25,31 +26,42 @@ public class UDPClient {
     private ExecutorService IOHandling = Executors.newFixedThreadPool(2);
 
     private final int PORT;
-    private final String BROADCAST_PREFIX = "B";
     private final int BROADCAST_PORT;
 
-    private final String MULTICAST_PREFIX = "M";
     private final int MULTICAST_PORT;
-    private final String MULTICAST_GROUP_ADDRESS = "239.1.1.1";
+    
+    private ArrayList<String> multicastAddresses = new ArrayList<>();
     
     private volatile boolean isRunning;
 
-    public UDPClient(int host_port) throws IOException {
+    public UDPClient(int host_port) throws UnknownHostException, SocketException{
         this.PORT = host_port;
         this.BROADCAST_PORT = getBroadcastPort(this.PORT);
         this.MULTICAST_PORT = getMulticastPort(this.PORT);
 
         this.isRunning = false;
-        setupMulticast();
-        setupBroadcast();
     }
 
+    public void start() throws IOException{
+        setupMulticast();
+        setupBroadcast();
+        this.isRunning = true;
+        this.IOHandling.submit(this::handleSend);
+        this.IOHandling.submit(this::handleReceive);
+        System.out.println("Client is running");
+        System.out.println("Type <end> to close client");
+        System.out.println("Message structure: <port><type> message");
+    }
+    
     private void setupMulticast() throws IOException {
         this.multicastChannel = DatagramChannel.open();
         this.multicastChannel.configureBlocking(false);
         this.multicastChannel.setOption(StandardSocketOptions.SO_REUSEADDR, true);
         this.multicastChannel.bind(new InetSocketAddress(this.MULTICAST_PORT));
-        this.multicastChannel.join(InetAddress.getByName(this.MULTICAST_GROUP_ADDRESS), this.nic);
+
+        for(String address : this.multicastAddresses){
+            this.multicastChannel.join(InetAddress.getByName(address), this.nic);
+        }
     }
 
     private void setupBroadcast() throws IOException {
@@ -60,15 +72,6 @@ public class UDPClient {
         this.broadcastChannel.bind(new InetSocketAddress(this.BROADCAST_PORT));
     }
 
-    public void start(){
-        this.isRunning = true;
-        this.IOHandling.submit(this::handleSend);
-        this.IOHandling.submit(this::handleReceive);
-        System.out.println("Client is running");
-        System.out.println("Type <end> to close client");
-        System.out.println("Message structure: <port><type> message");
-    }
-    
     private void handleReceive(){
         try(Selector selector = Selector.open()){
             this.multicastChannel.register(selector, SelectionKey.OP_READ, "MULTICAST");
@@ -101,7 +104,7 @@ public class UDPClient {
     private void handleSend(){
         try(Scanner scanner = new Scanner(System.in)){
             while(this.isRunning){
-                System.out.print("Choose type (broadcast/multicast/end): ");
+                System.out.println("Choose type (broadcast/multicast/end): ");
                 String choice = scanner.nextLine();
 
                 switch(choice.toLowerCase()){
@@ -110,10 +113,10 @@ public class UDPClient {
                         return;
                     }
                     case "broadcast" -> {
-                        System.out.print("Port: ");
+                        System.out.println("Port: ");
                         int port = Integer.parseInt(scanner.nextLine());
 
-                        System.out.print("Message: ");
+                        System.out.println("Message: ");
                         String message = scanner.nextLine();
 
                         ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
@@ -121,13 +124,19 @@ public class UDPClient {
                             new InetSocketAddress("255.255.255.255", getBroadcastPort(port)));
                     }
                     case "multicast" -> {
-                        System.out.print("Port: ");
+                        System.out.println("Port: ");
                         int port = Integer.parseInt(scanner.nextLine());
 
-                        System.out.print("Multicast address: ");
-                        String address = scanner.nextLine();
+                        System.out.println("Multicast address (if left empty, first from the list will be chosen): ");
+                        for(String address : this.multicastAddresses){
+                            System.out.println(address);
+                        }
+                        String address = scanner.nextLine().trim();
+                        if(address.isEmpty()){
+                            address = this.multicastAddresses.get(0);
+                        }
 
-                        System.out.print("Message: ");
+                        System.out.println("Message: ");
                         String message = scanner.nextLine();
 
                         ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
@@ -141,6 +150,10 @@ public class UDPClient {
             if(this.isRunning) e.printStackTrace();
         }
     }    
+
+    public void addMulticastAddress(String address){
+        this.multicastAddresses.add(address);
+    }
 
     private int getMulticastPort(int port){
         return port;
@@ -163,6 +176,7 @@ public class UDPClient {
             return;
         }
         UDPClient client = new UDPClient(Integer.parseInt(args[0]));
+        client.addMulticastAddress("239.1.1.1");
         client.start();
     }
 }
