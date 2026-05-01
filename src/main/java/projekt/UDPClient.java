@@ -26,11 +26,14 @@ public class UDPClient {
 
     private final int PORT;
     private final String MULTICAST_GROUP_ADDRESS = "239.1.1.1";
+    private final String BROADCAST_PREFIX = "B";
+    private final String MULTICAST_PREFIX = "M";
     
     private volatile boolean isRunning;
 
-    public UDPClient(int port) throws IOException {
-        this.PORT = port;
+    public UDPClient(int host_port) throws IOException {
+        this.PORT = host_port;
+
         this.isRunning = false;
         setupMulticast();
         setupBroadcast();
@@ -74,7 +77,7 @@ public class UDPClient {
 
                     InetSocketAddress senderAddress = (InetSocketAddress) channel.receive(buffer);
                     String message = new String(buffer.array(), 0, buffer.limit()); 
-                    System.out.println(type + "|" + senderAddress + ": " + message);
+                    System.out.println(type + senderAddress + ": " + message);
                 }
                 selector.selectedKeys().clear();
             }
@@ -90,18 +93,21 @@ public class UDPClient {
         try(Scanner scanner = new Scanner(System.in)){
             while(this.isRunning){
                 String input = scanner.nextLine();
-                ByteBuffer buffer = ByteBuffer.wrap(input.getBytes(StandardCharsets.UTF_8));
 
+                Integer port = getPortFromInput(input);
                 ChannelType channelType = getChannelTypeFromInput(input);
-                if(channelType == ChannelType.UNDEFINED){
-                    System.out.println("Define channel type: <channel_type> message");
+                if(channelType == ChannelType.UNDEFINED || port <= 0){
+                    System.out.println("Define channel type: <port><channel_type> message");
                     continue;
                 }
 
+                String message = cleanInput(input);
+                ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
+
                 if(channelType == ChannelType.MULTICAST){
-                    this.multicastChannel.send(buffer, new InetSocketAddress(this.MULTICAST_GROUP_ADDRESS, this.PORT));
+                    this.multicastChannel.send(buffer, new InetSocketAddress(this.MULTICAST_GROUP_ADDRESS, port));
                 }else{
-                    this.broadcastChannel.send(buffer, new InetSocketAddress("255.255.255.255", this.PORT));
+                    this.broadcastChannel.send(buffer, new InetSocketAddress("255.255.255.255", port));
                 }
             }
         }catch(Exception e){
@@ -112,13 +118,31 @@ public class UDPClient {
         }
     }
 
+    private String cleanInput(String input){
+        int prefixLength = 4 + this.MULTICAST_PREFIX.length();
+        input = input.substring(prefixLength); 
+        if(input.startsWith(" ")){
+            input = input.substring(1);
+        }
+        return input;
+    }
+
+    private Integer getPortFromInput(String input){
+        String strPort = input.substring(0, 4);
+        try{
+            int port = Integer.parseInt(strPort);
+            return port;
+        }catch(NumberFormatException e){
+            return -1;
+        }
+    }
+
     private ChannelType getChannelTypeFromInput(String input){
-        String broadcastPrefix = "Broadcast";
-        String multicastPrefix = "Multicast";
-        if(input.toLowerCase().startsWith(broadcastPrefix.toLowerCase())){
+        input = input.substring(4);
+        if(input.toLowerCase().startsWith(this.BROADCAST_PREFIX.toLowerCase())){
             return ChannelType.BROADCAST;
         }
-        if(input.toLowerCase().startsWith(multicastPrefix.toLowerCase())){
+        if(input.toLowerCase().startsWith(this.MULTICAST_PREFIX.toLowerCase())){
             return ChannelType.MULTICAST;
         }
         return ChannelType.UNDEFINED;
@@ -132,7 +156,11 @@ public class UDPClient {
     }
 
     public static void main(String[] args) throws IOException {
-        UDPClient client = new UDPClient(4444);
+        if(args.length != 1){
+            System.out.println("Wrong number of arguments: <host_port>");
+            return;
+        }
+        UDPClient client = new UDPClient(Integer.parseInt(args[0]));
         client.start();
     }
 }
