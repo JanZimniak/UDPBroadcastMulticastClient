@@ -38,6 +38,7 @@ public class UDPClient {
 
     private void setupMulticast() throws IOException {
         this.multicastChannel = DatagramChannel.open();
+        this.multicastChannel.configureBlocking(false);
         this.multicastChannel.setOption(StandardSocketOptions.SO_REUSEADDR, true);
         this.multicastChannel.bind(new InetSocketAddress(this.PORT));
         this.multicastChannel.join(InetAddress.getByName(this.MULTICAST_GROUP_ADDRESS), this.nic);
@@ -45,6 +46,7 @@ public class UDPClient {
 
     private void setupBroadcast() throws IOException {
         this.broadcastChannel = DatagramChannel.open();
+        this.broadcastChannel.configureBlocking(false);
         this.broadcastChannel.setOption(StandardSocketOptions.SO_REUSEADDR, true);
         this.broadcastChannel.setOption(StandardSocketOptions.SO_BROADCAST, true);
         this.broadcastChannel.bind(new InetSocketAddress(this.PORT));
