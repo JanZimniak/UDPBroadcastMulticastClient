@@ -113,43 +113,10 @@ public class UDPClient {
                         return;
                     }
                     case "broadcast" -> {
-                        System.out.println("Port: ");
-                        int port = Integer.parseInt(scanner.nextLine());
-
-                        System.out.println("Message: ");
-                        String message = scanner.nextLine();
-
-                        ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
-                        this.broadcastChannel.send(buffer,
-                            new InetSocketAddress("255.255.255.255", getBroadcastPort(port)));
+                        handleBroadcast(scanner); 
                     }
                     case "multicast" -> {
-                        System.out.println("Port: ");
-                        int port = Integer.parseInt(scanner.nextLine());
-
-                        System.out.println("Multicast address (if left empty, first from the list will be chosen): ");
-                        for(String address : this.multicastAddresses){
-                            System.out.println(address);
-                        }
-                        String input = scanner.nextLine().trim();
-                        boolean isAddressCorrect = checkAddress(input);
-                        String address;
-                        if(isAddressCorrect){
-                            address = input;
-                        }else{
-                            address = "";
-                        }
-                        if(address.isEmpty()){
-                            System.out.println("Using default multicast address");
-                            address = this.multicastAddresses.get(0);
-                        }
-
-                        System.out.println("Message: ");
-                        String message = scanner.nextLine();
-
-                        ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
-                        this.multicastChannel.send(buffer,
-                            new InetSocketAddress(address, getMulticastPort(port)));
+                        handleMulticast(scanner);
                     }
                     default -> System.out.println("Unknown option.");
                 }
@@ -158,6 +125,47 @@ public class UDPClient {
             if(this.isRunning) e.printStackTrace();
         }
     }    
+
+    private void handleBroadcast(Scanner scanner) throws IOException{
+        System.out.println("Port: ");
+        int port = Integer.parseInt(scanner.nextLine());
+
+        System.out.println("Message: ");
+        String message = scanner.nextLine();
+
+        ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
+        this.broadcastChannel.send(buffer,
+            new InetSocketAddress("255.255.255.255", getBroadcastPort(port)));
+    }
+
+    private void handleMulticast(Scanner scanner) throws IOException{
+        System.out.println("Port: ");
+        int port = Integer.parseInt(scanner.nextLine());
+
+        System.out.println("Multicast address (if left empty, first from the list will be chosen): ");
+        for(String address : this.multicastAddresses){
+            System.out.println(address);
+        }
+        String input = scanner.nextLine().trim();
+        boolean isAddressCorrect = checkAddress(input);
+        String address;
+        if(isAddressCorrect){
+            address = input;
+        }else{
+            address = "";
+        }
+        if(address.isEmpty()){
+            System.out.println("Using default multicast address");
+            address = this.multicastAddresses.get(0);
+        }
+
+        System.out.println("Message: ");
+        String message = scanner.nextLine();
+
+        ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
+        this.multicastChannel.send(buffer,
+            new InetSocketAddress(address, getMulticastPort(port)));
+    }
 
     private boolean checkAddress(String input){
         try{
