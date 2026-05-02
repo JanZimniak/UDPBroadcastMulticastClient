@@ -27,11 +27,15 @@ public class UDPClient {
     private ExecutorService IOHandling = Executors.newFixedThreadPool(2);
 
     private final int PORT;
+    private final int MIN_PORT_NUMBER = 1024;
+    private final int MAX_PORT_NUMBER = 65535;
+
     private final int BROADCAST_PORT;
 
     private final int MULTICAST_PORT;
     
     private HashMap<String, MembershipKey> multicastAddresses = new HashMap<>();
+    private final String DEFAULT_MULTICAST_ADDRESS = "239.1.1.1";
     
     private volatile boolean isRunning;
 
@@ -130,7 +134,12 @@ public class UDPClient {
 
     private void handleBroadcast(Scanner scanner) throws IOException{
         System.out.println("Port: ");
-        int port = Integer.parseInt(scanner.nextLine());
+        String portInput = scanner.nextLine();
+        if(!checkPort(portInput)){
+            System.out.printf("Wrong port number, choose from: %d - %d\n", this.MIN_PORT_NUMBER, this.MAX_PORT_NUMBER);
+            return;
+        }
+        int port = Integer.parseInt(portInput);
 
         System.out.println("Message: ");
         String message = scanner.nextLine();
@@ -143,7 +152,12 @@ public class UDPClient {
     private void handleMulticast(Scanner scanner) throws IOException{
         System.out.println("Port: ");
 
-        int port = Integer.parseInt(scanner.nextLine());
+        String portInput = scanner.nextLine();
+        if(!checkPort(portInput)){
+            System.out.printf("Wrong port number, choose from: %d - %d\n", this.MIN_PORT_NUMBER, this.MAX_PORT_NUMBER);
+            return;
+        }
+        int port = Integer.parseInt(portInput);
 
         System.out.println("Multicast address (if left empty, default will be used: 239.1.1.1): ");
 
@@ -161,7 +175,7 @@ public class UDPClient {
         }
         if(address.isEmpty()){
             System.out.println("Using default multicast address");
-            address = "239.1.1.1";
+            address = this.DEFAULT_MULTICAST_ADDRESS;
         }
 
         System.out.println("Message: ");
@@ -205,6 +219,16 @@ public class UDPClient {
         try{
             return InetAddress.getByName(input).isMulticastAddress();
         }catch(UnknownHostException e){
+            return false;
+        }
+    }
+
+    private boolean checkPort(String portInput){
+        int port;
+        try{
+            port = Integer.parseInt(portInput);
+            return this.MIN_PORT_NUMBER <= port && port <= this.MAX_PORT_NUMBER;
+        }catch(NumberFormatException e){
             return false;
         }
     }
