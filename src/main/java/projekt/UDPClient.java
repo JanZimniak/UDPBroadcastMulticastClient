@@ -9,10 +9,11 @@ import java.net.StandardSocketOptions;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.MembershipKey;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,21 +31,20 @@ public class UDPClient {
 
     private final int MULTICAST_PORT;
     
-    private ArrayList<String> multicastAddresses = new ArrayList<>();
+    private HashMap<String, MembershipKey> multicastAddresses = new HashMap<>();
     
     private volatile boolean isRunning;
 
-    public UDPClient(int host_port) throws UnknownHostException, SocketException{
+    public UDPClient(int host_port) throws IOException{
         this.PORT = host_port;
         this.BROADCAST_PORT = getBroadcastPort(this.PORT);
         this.MULTICAST_PORT = getMulticastPort(this.PORT);
-
+        setupMulticast();
+        setupBroadcast();
         this.isRunning = false;
     }
 
-    public void start() throws IOException{
-        setupMulticast();
-        setupBroadcast();
+    public void start() {
         this.isRunning = true;
         this.IOHandling.submit(this::handleSend);
         this.IOHandling.submit(this::handleReceive);
@@ -58,10 +58,6 @@ public class UDPClient {
         this.multicastChannel.configureBlocking(false);
         this.multicastChannel.setOption(StandardSocketOptions.SO_REUSEADDR, true);
         this.multicastChannel.bind(new InetSocketAddress(this.MULTICAST_PORT));
-
-        for(String address : this.multicastAddresses){
-            this.multicastChannel.join(InetAddress.getByName(address), this.nic);
-        }
     }
 
     private void setupBroadcast() throws IOException {
@@ -104,7 +100,7 @@ public class UDPClient {
     private void handleSend(){
         try(Scanner scanner = new Scanner(System.in)){
             while(this.isRunning){
-                System.out.println("Choose type (broadcast/multicast/end): ");
+                System.out.println("Choose type (broadcast/multicast/join/leave/end): ");
                 String choice = scanner.nextLine();
 
                 switch(choice.toLowerCase()){
@@ -117,6 +113,12 @@ public class UDPClient {
                     }
                     case "multicast" -> {
                         handleMulticast(scanner);
+                    }
+                    case "join" -> {
+                        handleJoinOrLeaveMulticastGroup(scanner, true);
+                    }
+                    case "leave" -> {
+                        handleJoinOrLeaveMulticastGroup(scanner, false);
                     }
                     default -> System.out.println("Unknown option.");
                 }
@@ -140,23 +142,26 @@ public class UDPClient {
 
     private void handleMulticast(Scanner scanner) throws IOException{
         System.out.println("Port: ");
+
         int port = Integer.parseInt(scanner.nextLine());
 
-        System.out.println("Multicast address (if left empty, first from the list will be chosen): ");
-        for(String address : this.multicastAddresses){
-            System.out.println(address);
+        System.out.println("Multicast address (if left empty, default will be used: 239.1.1.1): ");
+
+        if(!this.multicastAddresses.isEmpty()){
+            System.out.println("Joined multicast groups:");
+            for(String address : this.multicastAddresses.keySet()){
+                System.out.println(address);
+            }
         }
+
         String input = scanner.nextLine().trim();
-        boolean isAddressCorrect = checkAddress(input);
-        String address;
-        if(isAddressCorrect){
+        String address = "";
+        if(checkMulticastAddress(input)){
             address = input;
-        }else{
-            address = "";
         }
         if(address.isEmpty()){
             System.out.println("Using default multicast address");
-            address = this.multicastAddresses.get(0);
+            address = "239.1.1.1";
         }
 
         System.out.println("Message: ");
@@ -167,16 +172,41 @@ public class UDPClient {
             new InetSocketAddress(address, getMulticastPort(port)));
     }
 
-    private boolean checkAddress(String input){
+    private void handleJoinOrLeaveMulticastGroup(Scanner scanner, boolean isJoining){
+        System.out.println("Multicast group IP Address:");
+        String ipAddress = scanner.nextLine();
+        if(!checkMulticastAddress(ipAddress)){
+            System.out.println("Not a multicast IP Address");
+            return;
+        }
+        if(isJoining){
+            joinMulticastGroup(ipAddress);
+        }else{
+            leaveMulticastGroup(ipAddress);
+        }
+    }
+
+    private void joinMulticastGroup(String ipAddress){
+        try{
+            MembershipKey key = this.multicastChannel.join(InetAddress.getByName(ipAddress), this.nic);
+            this.multicastAddresses.put(ipAddress, key);
+        }catch(IOException e){
+            System.out.println("Couldn't join multicast group: " + e.getMessage());
+        }
+    }
+
+    private void leaveMulticastGroup(String ipAddress){
+        MembershipKey key = this.multicastAddresses.get(ipAddress);
+        key.drop();
+        this.multicastAddresses.remove(ipAddress);
+    }
+
+    private boolean checkMulticastAddress(String input){
         try{
             return InetAddress.getByName(input).isMulticastAddress();
         }catch(UnknownHostException e){
             return false;
         }
-    }
-
-    public void addMulticastAddress(String address){
-        this.multicastAddresses.add(address);
     }
 
     private int getMulticastPort(int port){
@@ -200,7 +230,6 @@ public class UDPClient {
             return;
         }
         UDPClient client = new UDPClient(Integer.parseInt(args[0]));
-        client.addMulticastAddress("239.1.1.1");
         client.start();
     }
 }
