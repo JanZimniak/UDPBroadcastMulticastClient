@@ -131,8 +131,16 @@ public class UDPClient {
                         for(String address : this.multicastAddresses){
                             System.out.println(address);
                         }
-                        String address = scanner.nextLine().trim();
+                        String input = scanner.nextLine().trim();
+                        boolean isAddressCorrect = checkAddress(input);
+                        String address;
+                        if(isAddressCorrect){
+                            address = input;
+                        }else{
+                            address = "";
+                        }
                         if(address.isEmpty()){
+                            System.out.println("Using default multicast address");
                             address = this.multicastAddresses.get(0);
                         }
 
@@ -150,6 +158,14 @@ public class UDPClient {
             if(this.isRunning) e.printStackTrace();
         }
     }    
+
+    private boolean checkAddress(String input){
+        try{
+            return InetAddress.getByName(input).isMulticastAddress();
+        }catch(UnknownHostException e){
+            return false;
+        }
+    }
 
     public void addMulticastAddress(String address){
         this.multicastAddresses.add(address);
