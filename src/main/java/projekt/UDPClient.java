@@ -66,10 +66,8 @@ public class UDPClient {
                 / /__   / /  / / / -_) / _ \\/ __/
                 \\___/  /_/  /_/  \\__/ /_//_/\\__/ """;
             
-        synchronized(this.draw){
-            this.draw.addConstMessage(clientHuge);
-            this.draw.switchFooterMessage("Choose type (broadcast/multicast/join/leave/end): ");
-        };
+        this.draw.addConstMessage(clientHuge);
+        this.draw.switchFooterMessage("Choose type (broadcast/multicast/join/leave/end): ");
     }
     
     private void setupMulticast() throws IOException {
@@ -121,9 +119,7 @@ public class UDPClient {
     private void handleSend(){
         try(Scanner scanner = new Scanner(System.in)){
             while(this.isRunning){
-                synchronized(this.draw){
-                    this.draw.switchFooterMessage("Choose type (broadcast/multicast/join/leave/end): ");
-                }
+                synchronized(this.draw){this.draw.switchFooterMessage("Choose type (broadcast/multicast/join/leave/end): ");}
                 String choice = scanner.nextLine();
 
                 switch(choice.toLowerCase()){
@@ -132,30 +128,20 @@ public class UDPClient {
                         return;
                     }
                     case "broadcast" -> {
-                        synchronized(this.draw){
-                            handleBroadcast(scanner); 
-                        }
+                        handleBroadcast(scanner); 
                     }
                     case "multicast" -> {
-                        synchronized(this.draw){
-                            handleMulticast(scanner);
-                        }
+                        handleMulticast(scanner);
                     }
                     case "join" -> {
-                        synchronized(this.draw){
-                            handleJoinOrLeaveMulticastGroup(scanner, true);
-                        }
+                        handleJoinOrLeaveMulticastGroup(scanner, true);
                     }
                     case "leave" -> {
-                        synchronized(this.draw){
-                            handleJoinOrLeaveMulticastGroup(scanner, false);
-                        }
+                        handleJoinOrLeaveMulticastGroup(scanner, false);
                     }
                     default -> 
                     {
-                        synchronized(this.draw){
-                            this.draw.addScrolledData("Unknown option.");
-                        }
+                        synchronized(this.draw){this.draw.addScrolledData("Unknown option.");}
                     }
                 }
             }
@@ -165,34 +151,34 @@ public class UDPClient {
     }    
 
     private void handleBroadcast(Scanner scanner) throws IOException{
-        this.draw.switchFooterMessage("Port: ");
+        synchronized(this.draw){this.draw.switchFooterMessage("Port: ");}
         String portInput = scanner.nextLine();
         if(!checkPort(portInput)){
-            this.draw.addScrolledData("Wrong port number, choose from: " + this.MIN_PORT_NUMBER + "-" + this.MAX_PORT_NUMBER);
+            synchronized(this.draw){this.draw.addScrolledData("Wrong port number, choose from: " + this.MIN_PORT_NUMBER + "-" + this.MAX_PORT_NUMBER);}
             return;
         }
         int port = Integer.parseInt(portInput);
 
-        this.draw.switchFooterMessage("Message: ");
+        synchronized(this.draw){this.draw.switchFooterMessage("Message: ");}
         String message = scanner.nextLine();
 
         ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
         this.broadcastChannel.send(buffer,
             new InetSocketAddress("255.255.255.255", getBroadcastPort(port)));
-        this.draw.addScrolledData("SENT BROADCAST/255.255.255/" + portInput + ": " + message);
+        synchronized(this.draw){this.draw.addScrolledData("SENT BROADCAST/255.255.255/" + portInput + ": " + message);}
     }
 
     private void handleMulticast(Scanner scanner) throws IOException{
-        this.draw.switchFooterMessage("Port: ");
+        synchronized(this.draw){this.draw.switchFooterMessage("Port: ");}
 
         String portInput = scanner.nextLine();
         if(!checkPort(portInput)){
-            this.draw.addScrolledData("Wrong port number, choose from: " + this.MIN_PORT_NUMBER + "-" + this.MAX_PORT_NUMBER);
+            synchronized(this.draw){this.draw.addScrolledData("Wrong port number, choose from: " + this.MIN_PORT_NUMBER + "-" + this.MAX_PORT_NUMBER);}
             return;
         }
         int port = Integer.parseInt(portInput);
 
-        this.draw.switchFooterMessage("Multicast address (if left empty, default will be used: 239.1.1.1): ");
+        synchronized(this.draw){this.draw.switchFooterMessage("Multicast address (if left empty, default will be used: 239.1.1.1): ");}
 
         if(!this.multicastAddresses.isEmpty()){
             System.out.println("Joined multicast groups:");
@@ -208,24 +194,24 @@ public class UDPClient {
         }else if(checkMulticastAddress(input)){
             address = input;
         }else{
-            this.draw.addScrolledData("Not a multicast address");
+            synchronized(this.draw){this.draw.addScrolledData("Not a multicast address");}
             return;
         }
 
-        this.draw.switchFooterMessage("Message: ");
+        synchronized(this.draw){this.draw.switchFooterMessage("Message: ");}
         String message = scanner.nextLine();
 
         ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
         this.multicastChannel.send(buffer,
             new InetSocketAddress(address, getMulticastPort(port)));
-        this.draw.addScrolledData("SENT MULTICAST/" + address + "/" + portInput + ": " + message);
+        synchronized(this.draw){this.draw.addScrolledData("SENT MULTICAST/" + address + "/" + portInput + ": " + message);}
     }
 
     private void handleJoinOrLeaveMulticastGroup(Scanner scanner, boolean isJoining){
-        this.draw.switchFooterMessage("Multicast group IP Address:");
+        synchronized(this.draw){this.draw.switchFooterMessage("Multicast group IP Address:");}
         String ipAddress = scanner.nextLine();
         if(!checkMulticastAddress(ipAddress)){
-            this.draw.addScrolledData("Not a multicast IP Address");
+            synchronized(this.draw){this.draw.addScrolledData("Not a multicast IP Address");}
             return;
         }
         if(isJoining){
@@ -240,11 +226,14 @@ public class UDPClient {
             MembershipKey key = this.multicastChannel.join(InetAddress.getByName(ipAddress), this.nic);
             this.multicastAddresses.put(ipAddress, key);
         }catch(IOException e){
-            this.draw.addScrolledData("Couldn't join multicast group: " + e.getMessage());
+            synchronized(this.draw){this.draw.addScrolledData("Couldn't join multicast group: " + e.getMessage());}
         }
     }
 
     private void leaveMulticastGroup(String ipAddress){
+        if(!this.multicastAddresses.containsKey(ipAddress)){
+            return;
+        }
         MembershipKey key = this.multicastAddresses.get(ipAddress);
         key.drop();
         this.multicastAddresses.remove(ipAddress);
